@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation Pipeline</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .header-content {
+            text-align: center;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #34495e;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover {
+            border-color: #2980b9;
+            background-color: #f8f9fa;
+        }
+        
+        .upload-area.dragover {
+            border-color: #e74c3c;
+            background-color: #fef5f5;
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+            margin: 0.25rem;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+        }
+        
+        .btn-success:hover {
+            background: #229954;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .status-item {
+            background: #ecf0f1;
+            padding: 1rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .status-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .status-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #3498db;
+            transition: width 0.3s ease;
+        }
+        
+        .log-area {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .documents-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .documents-table th,
+        .documents-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .documents-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .badge-pending {
+            background: #ffeaa7;
+            color: #6c5ce7;
+        }
+        
+        .badge-processing {
+            background: #74b9ff;
+            color: white;
+        }
+        
+        .badge-completed {
+            background: #00b894;
+            color: white;
+        }
+        
+        .badge-failed {
+            background: #e17055;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>Translation Matching Pipeline</h1>
+                <p class="subtitle">Upload PDFs, match with XML documents, and track the translation process</p>
+            </div>
+        </header>
+        
+        <div class="dashboard">
+            <!-- Upload Section -->
+            <div class="card">
+                <h3>📄 Upload PDFs</h3>
+                <div class="upload-area" id="uploadArea">
+                    <p>📎 Drag & drop PDF files here or click to browse</p>
+                    <input type="file" id="fileInput" multiple accept=".pdf" class="hidden">
+                    <div id="uploadProgress" class="hidden">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p id="uploadStatus">Uploading...</p>
+                    </div>
+                </div>
+                <div id="uploadResults"></div>
+            </div>
+            
+            <!-- Pipeline Controls -->
+            <div class="card">
+                <h3>⚙️ Pipeline Controls</h3>
+                <button class="btn" id="initXmlBtn">Initialize XML Documents</button>
+                <button class="btn" id="startMatchingBtn">Start Document Matching</button>
+                <button class="btn btn-success" id="refreshBtn">Refresh Status</button>
+                <div id="pipelineStatus"></div>
+            </div>
+            
+            <!-- Status Overview -->
+            <div class="card">
+                <h3>📊 Status Overview</h3>
+                <div class="status-grid" id="statusGrid">
+                    <div class="status-item">
+                        <div class="status-number" id="pdfCount">0</div>
+                        <div class="status-label">PDFs</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-number" id="xmlCount">0</div>
+                        <div class="status-label">XML Docs</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-number" id="matchCount">0</div>
+                        <div class="status-label">Matches</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-number" id="jobCount">0</div>
+                        <div class="status-label">Active Jobs</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Documents Table -->
+        <div class="card">
+            <h3>📋 Documents</h3>
+            <table class="documents-table" id="documentsTable">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Language</th>
+                        <th>Author</th>
+                        <th>Processed</th>
+                    </tr>
+                </thead>
+                <tbody id="documentsTableBody">
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #7f8c8d;">
+                            Loading documents...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Activity Log -->
+        <div class="card">
+            <h3>📝 Activity Log</h3>
+            <div class="log-area" id="activityLog">
+                Welcome to the Translation Pipeline!\n
+                Click "Refresh Status" to load current state.\n
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/app.js"></script>
+</body>
+</html>
