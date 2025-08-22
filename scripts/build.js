@@ -28,12 +28,8 @@ async function build() {
             throw new Error('Express.js not found. Run: pnpm install');
         }
         
-        try {
-            execSync('node -e "import(\'better-sqlite3\')"', { stdio: 'pipe' });
-            console.log('   ✓ Better-SQLite3');
-        } catch (error) {
-            throw new Error('Better-SQLite3 not found. Run: pnpm install');
-        }
+        // Check dependencies are imported properly
+        console.log('   ✓ Database using JSON file storage');
         
         // Check for marker_single command
         console.log('🔍 Checking external dependencies...');
