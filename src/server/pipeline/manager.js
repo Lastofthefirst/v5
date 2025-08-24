@@ -274,84 +274,6 @@ export class PipelineManager {
             throw error;
         }
     }
-    
-    async initializeAndProcessInputPdfs() {
-        try {
-            this.logger.info('Starting automatic processing of input_pdfs folder...');
-            const inputPdfsDir = join(__dirname, '../../../input_pdfs');
-            
-            // Check if input_pdfs directory exists
-            try {
-                await stat(inputPdfsDir);
-            } catch (error) {
-                this.logger.warn('input_pdfs directory not found, skipping automatic processing');
-                return { message: 'input_pdfs directory not found', processed: 0, skipped: 0 };
-            }
-            
-            const files = await readdir(inputPdfsDir);
-            const pdfFiles = files.filter(file => extname(file).toLowerCase() === '.pdf');
-            
-            if (pdfFiles.length === 0) {
-                this.logger.info('No PDF files found in input_pdfs directory');
-                return { message: 'No PDF files found', processed: 0, skipped: 0 };
-            }
-            
-            this.logger.info(`Found ${pdfFiles.length} PDF files in input_pdfs directory`);
-            
-            let processed = 0;
-            let skipped = 0;
-            
-            for (const pdfFile of pdfFiles) {
-                const filePath = join(inputPdfsDir, pdfFile);
-                
-                // Check if already processed
-                const existing = await getQuery(
-                    'SELECT id, status FROM documents WHERE filename = ? AND type = ?',
-                    [pdfFile, 'pdf']
-                );
-                
-                if (existing) {
-                    if (existing.status === 'completed') {
-                        this.logger.debug(`Skipping already processed PDF: ${pdfFile} (ID: ${existing.id})`);
-                        skipped++;
-                        continue;
-                    } else if (existing.status === 'failed') {
-                        this.logger.info(`Retrying failed PDF: ${pdfFile} (ID: ${existing.id})`);
-                        // Update status to pending and reprocess
-                        await this.updateDocumentStatus(existing.id, 'pending');
-                        this.processPdfDocument(existing.id).catch(error => {
-                            this.logger.error(`Error reprocessing PDF ${pdfFile}:`, error);
-                            this.updateDocumentStatus(existing.id, 'failed');
-                        });
-                        processed++;
-                        continue;
-                    } else {
-                        this.logger.info(`PDF already in progress: ${pdfFile} (ID: ${existing.id})`);
-                        skipped++;
-                        continue;
-                    }
-                }
-                
-                // Add new PDF document
-                this.logger.info(`Adding PDF from input_pdfs: ${pdfFile}`);
-                try {
-                    await this.addPdfDocument(filePath, pdfFile);
-                    processed++;
-                } catch (error) {
-                    this.logger.error(`Error adding PDF ${pdfFile}:`, error);
-                    // Continue processing other files
-                }
-            }
-            
-            const message = `Processed ${processed} PDF files from input_pdfs, skipped ${skipped} already processed`;
-            this.logger.info(message);
-            return { message, processed, skipped };
-            
-        } catch (error) {
-            this.logger.error('Error processing input_pdfs folder:', error);
-            throw error;
-        }
-    }
 
     async processXmlDocument(documentId) {
         try {
@@ -463,17 +385,25 @@ export class PipelineManager {
                     
                     const xmlText = elements.map(el => el.text_content).join(' ');
                     
-                    // Calculate similarity (basic for now, will use embeddings later)
-                    const score = await this.documentMatcher.calculateSimilarity(pdfText, xmlText);
+                    // Calculate text-based similarity
+                    const textScore = await this.documentMatcher.calculateSimilarity(pdfText, xmlText);
                     
-                    if (score > bestScore) {
-                        bestScore = score;
+                    // Calculate title-based similarity
+                    const titleScore = this.documentMatcher.calculateDocumentMatchByTitle(pdf.filename, xml.filename);
+                    
+                    // Combined score: give more weight to title matching for cross-language documents
+                    const combinedScore = Math.max(textScore, titleScore * 0.8);
+                    
+                    this.logger.debug(`Matching ${pdf.filename} vs ${xml.filename}: text=${textScore.toFixed(3)}, title=${titleScore.toFixed(3)}, combined=${combinedScore.toFixed(3)}`);
+                    
+                    if (combinedScore > bestScore) {
+                        bestScore = combinedScore;
                         bestMatch = xml;
                     }
                 }
                 
-                if (bestMatch && bestScore > 0.3) { // Threshold for matching
-                    const confidence = bestScore > 0.8 ? 'high' : bestScore > 0.6 ? 'medium' : 'low';
+                if (bestMatch && bestScore > 0.1) { // Lower threshold for cross-language matching
+                    const confidence = bestScore > 0.6 ? 'high' : bestScore > 0.3 ? 'medium' : 'low';
                     const needsReview = confidence === 'low';
                     
                     this.logger.info(`Document match found: ${pdf.filename} -> ${bestMatch.filename} (score: ${bestScore.toFixed(3)}, confidence: ${confidence})`);
