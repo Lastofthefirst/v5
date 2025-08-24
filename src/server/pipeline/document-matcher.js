@@ -38,12 +38,14 @@ export class DocumentMatcher {
             const jaccardScore = this.jaccardSimilarity(normalized1, normalized2);
             const cosineSimilarity = this.cosineSimilarity(normalized1, normalized2);
             const lengthSimilarity = this.lengthSimilarity(text1, text2);
+            const structuralSimilarity = this.structuralSimilarity(text1, text2);
             
             // Weighted combination
             const combinedScore = (
-                jaccardScore * 0.4 + 
-                cosineSimilarity * 0.4 + 
-                lengthSimilarity * 0.2
+                jaccardScore * 0.25 + 
+                cosineSimilarity * 0.25 + 
+                lengthSimilarity * 0.25 +
+                structuralSimilarity * 0.25
             );
             
             return Math.min(1.0, Math.max(0.0, combinedScore));
@@ -52,6 +54,86 @@ export class DocumentMatcher {
             this.logger.error('Error calculating document similarity:', error);
             return 0.0;
         }
+    }
+    
+    calculateDocumentMatchByTitle(pdfFilename, xmlFilename) {
+        // Extract and normalize titles for comparison
+        const pdfTitle = this.extractTitle(pdfFilename);
+        const xmlTitle = this.extractTitle(xmlFilename);
+        
+        // Direct title matches
+        const titleMatches = {
+            'oraciones': ['prayers', 'meditations'],
+            'meditaciones': ['prayers', 'meditations'],
+            'prayers': ['oraciones', 'meditaciones'],
+            'meditations': ['oraciones', 'meditaciones'],
+            'tablas': ['tablets'],
+            'tablets': ['tablas'],
+            'palabras': ['words'],
+            'words': ['palabras'],
+            'ocultas': ['hidden'],
+            'hidden': ['ocultas'],
+            'valle': ['valley'],
+            'valles': ['valley', 'valleys'],
+            'valley': ['valle', 'valles'],
+            'valleys': ['valles'],
+            'escritos': ['writings', 'gleanings'],
+            'writings': ['escritos'],
+            'gleanings': ['escritos'],
+            'llamado': ['call', 'summons'],
+            'call': ['llamado'],
+            'summons': ['llamado'],
+            'naciones': ['nations'],
+            'nations': ['naciones'],
+            'bahaullah': ['bahaullah'],
+            'abdul': ['abdul'],
+            'baha': ['baha'],
+            'bab': ['bab']
+        };
+        
+        let matchScore = 0;
+        const pdfWords = pdfTitle.split(' ');
+        const xmlWords = xmlTitle.split(' ');
+        
+        // Count matching words and their translations
+        for (const pdfWord of pdfWords) {
+            const matches = titleMatches[pdfWord] || [];
+            if (xmlWords.includes(pdfWord) || matches.some(match => xmlWords.includes(match))) {
+                matchScore += 1;
+            }
+        }
+        
+        // Normalize by the average number of words
+        const avgWordCount = (pdfWords.length + xmlWords.length) / 2;
+        return avgWordCount > 0 ? matchScore / avgWordCount : 0;
+    }
+    
+    extractTitle(filename) {
+        // Extract meaningful title from filename
+        return filename
+            .replace(/\.(pdf|xml)$/i, '')
+            .replace(/[-_]/g, ' ')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+    
+    structuralSimilarity(text1, text2) {
+        // Compare structural features like number of paragraphs, sentences, etc.
+        const paragraphs1 = text1.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+        const paragraphs2 = text2.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+        
+        const sentences1 = text1.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        const sentences2 = text2.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        
+        // Calculate structural similarity
+        const paragraphRatio = paragraphs1.length > 0 && paragraphs2.length > 0 ? 
+            Math.min(paragraphs1.length, paragraphs2.length) / Math.max(paragraphs1.length, paragraphs2.length) : 0;
+            
+        const sentenceRatio = sentences1.length > 0 && sentences2.length > 0 ? 
+            Math.min(sentences1.length, sentences2.length) / Math.max(sentences1.length, sentences2.length) : 0;
+        
+        return (paragraphRatio + sentenceRatio) / 2;
     }
     
     normalizeText(text) {
