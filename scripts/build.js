@@ -13,7 +13,11 @@ async function build() {
         
         // Create necessary directories
         console.log('📁 Creating directories...');
-        const dirs = ['data', 'uploads', 'public'];
+        const dirs = [
+            process.env.DATA_DIR || 'data', 
+            process.env.UPLOADS_DIR || 'uploads', 
+            'public'
+        ];
         for (const dir of dirs) {
             await mkdir(dir, { recursive: true });
             console.log(`   ✓ Created ${dir}/`);

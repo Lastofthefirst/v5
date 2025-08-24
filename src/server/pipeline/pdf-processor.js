@@ -10,13 +10,22 @@ import { existsSync } from 'fs';
 
 export class PdfProcessor {
     constructor() {
-        this.markerOutputDir = join(process.cwd(), 'data', 'marker_output');
+        this.markerOutputDir = join(
+            process.cwd(), 
+            process.env.MARKER_OUTPUT_DIR || 'data/marker_output'
+        );
         this.ensureOutputDir();
     }
     
     async ensureOutputDir() {
         try {
-            await mkdir(this.markerOutputDir, { recursive: true });
+            const outputDir = join(
+                process.cwd(),
+                process.env.DATA_DIR || 'data',
+                'marker_output'
+            );
+            this.markerOutputDir = outputDir;
+            await mkdir(outputDir, { recursive: true });
         } catch (error) {
             console.error('Error creating marker output directory:', error);
         }

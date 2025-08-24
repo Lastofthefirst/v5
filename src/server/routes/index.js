@@ -14,7 +14,7 @@ const __dirname = dirname(__filename);
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = join(__dirname, '../../../uploads');
+        const uploadDir = join(process.cwd(), process.env.UPLOADS_DIR || 'uploads');
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {

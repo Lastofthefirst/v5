@@ -25,7 +25,7 @@ let isInitialized = false;
 let nextId = 1;
 
 export async function initializeDatabase() {
-    const dbDir = join(__dirname, '../../../data');
+    const dbDir = join(process.cwd(), process.env.DATA_DIR || 'data');
     await mkdir(dbDir, { recursive: true });
     
     dbPath = join(dbDir, 'pipeline.json');
@@ -34,18 +34,40 @@ export async function initializeDatabase() {
         // Try to load existing database
         if (existsSync(dbPath)) {
             const data = await readFile(dbPath, 'utf-8');
-            database = JSON.parse(data);
-            
-            // Calculate next ID
-            for (const table of Object.values(database)) {
-                if (Array.isArray(table)) {
-                    for (const record of table) {
-                        if (record.id && record.id >= nextId) {
-                            nextId = record.id + 1;
+            if (data.trim()) {
+                database = JSON.parse(data);
+                
+                // Calculate next ID
+                for (const table of Object.values(database)) {
+                    if (Array.isArray(table)) {
+                        for (const record of table) {
+                            if (record.id && record.id >= nextId) {
+                                nextId = record.id + 1;
+                            }
                         }
                     }
                 }
+            } else {
+                // Initialize with empty database structure
+                database = {
+                    documents: [],
+                    document_matches: [],
+                    text_blocks: [],
+                    xml_elements: [],
+                    paragraph_matches: [],
+                    pipeline_jobs: []
+                };
             }
+        } else {
+            // Initialize with empty database structure
+            database = {
+                documents: [],
+                document_matches: [],
+                text_blocks: [],
+                xml_elements: [],
+                paragraph_matches: [],
+                pipeline_jobs: []
+            };
         }
         
         await saveDatabase();
@@ -54,7 +76,18 @@ export async function initializeDatabase() {
         
     } catch (error) {
         console.error('Database initialization error:', error);
-        throw error;
+        // Initialize with empty database structure
+        database = {
+            documents: [],
+            document_matches: [],
+            text_blocks: [],
+            xml_elements: [],
+            paragraph_matches: [],
+            pipeline_jobs: []
+        };
+        await saveDatabase();
+        isInitialized = true;
+        console.log('Initialized with fresh database due to error');
     }
 }
 
