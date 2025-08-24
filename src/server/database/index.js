@@ -34,9 +34,31 @@ export async function initializeDatabase() {
         // Try to load existing database
         if (existsSync(dbPath)) {
             const data = await readFile(dbPath, 'utf-8');
-            database = JSON.parse(data);
-            
-            // Calculate next ID
+            // Handle empty file case
+            if (data.trim() === '') {
+                console.log('Database file is empty, initializing with default structure');
+                await saveDatabase(); // Save the default database structure
+            } else {
+                database = JSON.parse(data);
+                
+                // Calculate next ID
+                for (const table of Object.values(database)) {
+                    if (Array.isArray(table)) {
+                        for (const record of table) {
+                            if (record.id && record.id >= nextId) {
+                                nextId = record.id + 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Initialize nextId based on default database if not loaded from file
+        if (!existsSync(dbPath) || (existsSync(dbPath) && (await readFile(dbPath, 'utf-8')).trim() === '')) {
+            // Reset nextId to 1 since we're using the default database structure
+            nextId = 1;
+            // Calculate next ID from default database
             for (const table of Object.values(database)) {
                 if (Array.isArray(table)) {
                     for (const record of table) {
