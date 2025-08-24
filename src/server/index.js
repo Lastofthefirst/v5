@@ -48,6 +48,23 @@ async function initialize() {
         console.log('Starting pipeline manager...');
         const pipelineManager = new PipelineManager();
         
+        // Auto-initialize XML documents and process input PDFs
+        console.log('Auto-initializing XML documents...');
+        try {
+            const xmlResult = await pipelineManager.initializeXmlDocuments(3); // Limit to 3 files for testing
+            console.log(`XML initialization result: ${xmlResult.message}`);
+        } catch (error) {
+            console.error('XML initialization failed:', error.message);
+        }
+        
+        console.log('Auto-processing input_pdfs folder...');
+        try {
+            const pdfResult = await pipelineManager.initializeAndProcessInputPdfs();
+            console.log(`PDF processing result: ${pdfResult.message}`);
+        } catch (error) {
+            console.error('Input PDFs processing failed:', error.message);
+        }
+        
         console.log('Setting up routes...');
         setupRoutes(app, pipelineManager);
         
@@ -56,6 +73,7 @@ async function initialize() {
             console.log('📁 Upload PDFs to /api/upload');
             console.log('🔍 Check status at /api/status');
             console.log('⚡ Real-time updates via WebSocket');
+            console.log('🤖 Auto-processing enabled for input_pdfs folder');
         });
         
     } catch (error) {

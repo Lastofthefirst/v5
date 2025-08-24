@@ -218,5 +218,15 @@ export function setupRoutes(app, pipelineManager) {
         }
     });
     
+    // Process input_pdfs folder
+    router.post('/process-input-pdfs', async (req, res) => {
+        try {
+            const result = await pipelineManager.initializeAndProcessInputPdfs();
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+    
     app.use('/api', router);
 }

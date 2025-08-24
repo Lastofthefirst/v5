@@ -6,6 +6,26 @@
 export class DocumentMatcher {
     constructor() {
         this.threshold = 0.3; // Minimum similarity threshold
+        this.logger = this.createLogger();
+    }
+    
+    createLogger() {
+        return {
+            info: (message, ...args) => {
+                console.log(`[DocumentMatcher] ${new Date().toISOString()} INFO: ${message}`, ...args);
+            },
+            error: (message, error, ...args) => {
+                console.error(`[DocumentMatcher] ${new Date().toISOString()} ERROR: ${message}`, error, ...args);
+            },
+            warn: (message, ...args) => {
+                console.warn(`[DocumentMatcher] ${new Date().toISOString()} WARN: ${message}`, ...args);
+            },
+            debug: (message, ...args) => {
+                if (process.env.DEBUG) {
+                    console.log(`[DocumentMatcher] ${new Date().toISOString()} DEBUG: ${message}`, ...args);
+                }
+            }
+        };
     }
     
     async calculateSimilarity(text1, text2) {
@@ -29,7 +49,7 @@ export class DocumentMatcher {
             return Math.min(1.0, Math.max(0.0, combinedScore));
             
         } catch (error) {
-            console.error('Error calculating document similarity:', error);
+            this.logger.error('Error calculating document similarity:', error);
             return 0.0;
         }
     }

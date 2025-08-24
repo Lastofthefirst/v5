@@ -6,6 +6,26 @@
 export class ParagraphMatcher {
     constructor() {
         this.threshold = 0.4; // Lower threshold for paragraph matching
+        this.logger = this.createLogger();
+    }
+    
+    createLogger() {
+        return {
+            info: (message, ...args) => {
+                console.log(`[ParagraphMatcher] ${new Date().toISOString()} INFO: ${message}`, ...args);
+            },
+            error: (message, error, ...args) => {
+                console.error(`[ParagraphMatcher] ${new Date().toISOString()} ERROR: ${message}`, error, ...args);
+            },
+            warn: (message, ...args) => {
+                console.warn(`[ParagraphMatcher] ${new Date().toISOString()} WARN: ${message}`, ...args);
+            },
+            debug: (message, ...args) => {
+                if (process.env.DEBUG) {
+                    console.log(`[ParagraphMatcher] ${new Date().toISOString()} DEBUG: ${message}`, ...args);
+                }
+            }
+        };
     }
     
     async calculateSimilarity(text1, text2) {
@@ -38,7 +58,7 @@ export class ParagraphMatcher {
             return Math.min(1.0, Math.max(0.0, combinedScore));
             
         } catch (error) {
-            console.error('Error calculating paragraph similarity:', error);
+            this.logger.error('Error calculating paragraph similarity:', error);
             return 0.0;
         }
     }

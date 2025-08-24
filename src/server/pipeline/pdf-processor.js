@@ -12,11 +12,32 @@ export class PdfProcessor {
     constructor() {
         this.markerOutputDir = join(process.cwd(), 'data', 'marker_output');
         this.ensureOutputDir();
+        this.logger = this.createLogger();
+    }
+    
+    createLogger() {
+        return {
+            info: (message, ...args) => {
+                console.log(`[PdfProcessor] ${new Date().toISOString()} INFO: ${message}`, ...args);
+            },
+            error: (message, error, ...args) => {
+                console.error(`[PdfProcessor] ${new Date().toISOString()} ERROR: ${message}`, error, ...args);
+            },
+            warn: (message, ...args) => {
+                console.warn(`[PdfProcessor] ${new Date().toISOString()} WARN: ${message}`, ...args);
+            },
+            debug: (message, ...args) => {
+                if (process.env.DEBUG) {
+                    console.log(`[PdfProcessor] ${new Date().toISOString()} DEBUG: ${message}`, ...args);
+                }
+            }
+        };
     }
     
     async ensureOutputDir() {
         try {
             await mkdir(this.markerOutputDir, { recursive: true });
+            this.logger?.info(`Ensured marker output directory: ${this.markerOutputDir}`);
         } catch (error) {
             console.error('Error creating marker output directory:', error);
         }
@@ -24,19 +45,20 @@ export class PdfProcessor {
     
     async extractTextBlocks(pdfPath) {
         try {
-            console.log(`Extracting text blocks from: ${pdfPath}`);
+            this.logger.info(`Extracting text blocks from: ${pdfPath}`);
             
             // Check if already processed
             const outputPath = join(this.markerOutputDir, `${basename(pdfPath, '.pdf')}.json`);
             
             if (existsSync(outputPath)) {
-                console.log('Using cached marker output');
+                this.logger.info('Using cached marker output');
                 const cachedData = await readFile(outputPath, 'utf-8');
                 const data = JSON.parse(cachedData);
                 return this.parseMarkerOutput(data.content);
             }
             
             // Run marker_single command
+            this.logger.info('Running marker extraction...');
             const markerData = await this.runMarker(pdfPath);
             
             // Save the structured data
@@ -47,12 +69,15 @@ export class PdfProcessor {
             };
             
             await writeFile(outputPath, JSON.stringify(structuredData, null, 2), 'utf-8');
+            this.logger.info(`Saved marker output to: ${outputPath}`);
             
             // Parse and return text blocks
-            return this.parseMarkerOutput(markerData);
+            const textBlocks = this.parseMarkerOutput(markerData);
+            this.logger.info(`Successfully extracted ${textBlocks.length} text blocks`);
+            return textBlocks;
             
         } catch (error) {
-            console.error('Error extracting text blocks:', error);
+            this.logger.error('Error extracting text blocks:', error);
             throw error;
         }
     }
@@ -76,26 +101,28 @@ export class PdfProcessor {
                 '--output_dir', tempOutputDir
             ];
             
-            console.log('Running marker command:', command, args.join(' '));
+            this.logger.info(`Running marker command: ${command} ${args.join(' ')}`);
             
-            const process = spawn(command, args, {
+            const childProcess = spawn(command, args, {
                 stdio: ['pipe', 'pipe', 'pipe']
             });
             
             let stdout = '';
             let stderr = '';
             
-            process.stdout.on('data', (data) => {
+            childProcess.stdout.on('data', (data) => {
                 stdout += data.toString();
+                this.logger.debug('Marker stdout:', data.toString());
             });
             
-            process.stderr.on('data', (data) => {
+            childProcess.stderr.on('data', (data) => {
                 stderr += data.toString();
-                console.log('Marker stderr:', data.toString()); // Log progress
+                this.logger.debug('Marker stderr:', data.toString()); // Log progress
             });
             
-            process.on('close', async (code) => {
+            childProcess.on('close', async (code) => {
                 if (code !== 0) {
+                    this.logger.error(`Marker process failed with code ${code}. stderr: ${stderr}`);
                     reject(new Error(`Marker process failed with code ${code}. stderr: ${stderr}`));
                     return;
                 }
@@ -105,22 +132,27 @@ export class PdfProcessor {
                     const expectedOutputFile = join(tempOutputDir, basename(pdfPath, '.pdf'), `${basename(pdfPath, '.pdf')}.json`);
                     
                     if (existsSync(expectedOutputFile)) {
+                        this.logger.info(`Reading marker output from: ${expectedOutputFile}`);
                         const markerContent = await readFile(expectedOutputFile, 'utf-8');
                         const data = JSON.parse(markerContent);
                         
                         // Clean up temp directory
                         await this.cleanupTempDir(tempOutputDir);
                         
+                        this.logger.info('Marker extraction completed successfully');
                         resolve(data);
                     } else {
+                        this.logger.error(`Marker output file not found: ${expectedOutputFile}`);
                         reject(new Error(`Marker output file not found: ${expectedOutputFile}`));
                     }
                 } catch (error) {
+                    this.logger.error('Error reading marker output:', error);
                     reject(error);
                 }
             });
             
-            process.on('error', (error) => {
+            childProcess.on('error', (error) => {
+                this.logger.error('Failed to start marker process:', error);
                 reject(new Error(`Failed to start marker process: ${error.message}`));
             });
         });
@@ -132,8 +164,9 @@ export class PdfProcessor {
             const { promisify } = await import('util');
             const execAsync = promisify(exec);
             await execAsync(`rm -rf "${tempDir}"`);
+            this.logger.debug(`Cleaned up temp directory: ${tempDir}`);
         } catch (error) {
-            console.warn('Failed to clean up temp directory:', error.message);
+            this.logger.warn('Failed to clean up temp directory:', error.message);
         }
     }
     
@@ -173,7 +206,7 @@ export class PdfProcessor {
             }
             
         } catch (error) {
-            console.error('Error parsing marker output:', error);
+            this.logger.error('Error parsing marker output:', error);
             // Fallback: treat as single text block
             textBlocks.push({
                 text: String(markerData),
@@ -181,7 +214,7 @@ export class PdfProcessor {
             });
         }
         
-        console.log(`Extracted ${textBlocks.length} text blocks`);
+        this.logger.info(`Extracted ${textBlocks.length} text blocks`);
         return textBlocks;
     }
     
@@ -226,7 +259,7 @@ export class PdfProcessor {
             return languageMap[detectedLang] || detectedLang || 'unknown';
             
         } catch (error) {
-            console.error('Error detecting language:', error);
+            this.logger.error('Error detecting language:', error);
             return 'unknown';
         }
     }
