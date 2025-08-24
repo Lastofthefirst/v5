@@ -14,11 +14,31 @@ export class XmlProcessor {
             explicitChildren: true,
             includeWhiteSpace: false
         });
+        this.logger = this.createLogger();
+    }
+    
+    createLogger() {
+        return {
+            info: (message, ...args) => {
+                console.log(`[XmlProcessor] ${new Date().toISOString()} INFO: ${message}`, ...args);
+            },
+            error: (message, error, ...args) => {
+                console.error(`[XmlProcessor] ${new Date().toISOString()} ERROR: ${message}`, error, ...args);
+            },
+            warn: (message, ...args) => {
+                console.warn(`[XmlProcessor] ${new Date().toISOString()} WARN: ${message}`, ...args);
+            },
+            debug: (message, ...args) => {
+                if (process.env.DEBUG) {
+                    console.log(`[XmlProcessor] ${new Date().toISOString()} DEBUG: ${message}`, ...args);
+                }
+            }
+        };
     }
     
     async extractElements(xmlPath) {
         try {
-            console.log(`Extracting elements from: ${xmlPath}`);
+            this.logger.info(`Extracting elements from: ${xmlPath}`);
             
             const xmlContent = await readFile(xmlPath, 'utf-8');
             const doc = new DOMParser().parseFromString(xmlContent, 'text/xml');
@@ -28,11 +48,11 @@ export class XmlProcessor {
             // Extract text-containing elements using DOM traversal
             this.extractTextElements(doc.documentElement, elements, '');
             
-            console.log(`Extracted ${elements.length} text elements`);
+            this.logger.info(`Extracted ${elements.length} text elements`);
             return elements;
             
         } catch (error) {
-            console.error('Error extracting XML elements:', error);
+            this.logger.error('Error extracting XML elements:', error);
             throw error;
         }
     }
@@ -265,7 +285,7 @@ export class XmlProcessor {
             return updatedXml;
             
         } catch (error) {
-            console.error('Error updating XML with translation:', error);
+            this.logger.error('Error updating XML with translation:', error);
             throw error;
         }
     }
